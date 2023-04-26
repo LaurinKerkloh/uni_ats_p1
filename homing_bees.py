@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import tkinter as tk
 from typing import List
 
 
@@ -53,10 +52,10 @@ class Feature:
     @classmethod
     def from_position_and_landmark(cls, position: Vector, landmark: Landmark) -> Feature:
         vector_to_center_of_landmark = landmark.position - position
-        hypotenuse = abs(landmark.position - position)
-        opposite = landmark.radius()
-        if hypotenuse != 0:
-            angle = math.asin(opposite / hypotenuse)
+        hypotenuse_length = abs(landmark.position - position)
+        opposite_length = landmark.radius()
+        if hypotenuse_length != 0:
+            angle = math.asin(opposite_length / hypotenuse_length)
         else:
             angle = 0
         start = vector_to_center_of_landmark.direction() - angle
@@ -65,9 +64,12 @@ class Feature:
         end = (vector_to_center_of_landmark.direction() + angle) % (2 * math.pi)
         return Feature(start, end)
 
+    def across_zero(self) -> bool:
+        return self.start > self.end
+
     def width(self) -> float:
         width = self.end - self.start
-        if self.start > self.end:
+        if self.across_zero():
             width += (2 * math.pi)
         return width
 
@@ -84,6 +86,23 @@ class Feature:
                 shortest_distance = distance
                 closest_feature = feature
         return closest_feature
+
+    def overlaps(self, other: Feature) -> bool:
+        a_start = self.start
+        a_end = self.end
+        b_start = other.start
+        b_end = other.end
+        if self.across_zero():
+            a_end += 2 * math.pi
+            b_start += 2 * math.pi
+            b_end += 2 * math.pi
+        if other.across_zero():
+            b_end += 2 * math.pi
+
+        return a_start < b_end and b_start < a_end
+
+    def join(self, other: Feature) -> Feature:
+        return Feature(min(self.start, other.start), max(self.end, other.end))
 
     def pos_v(self, snapshot_feature: Feature) -> Vector:
         vec = Vector(0, 0)
@@ -124,6 +143,8 @@ class Retina:
         self.white_features: List[Feature] = []
 
         for landmark in landmarks:
+            # dark_feature = Feature.from_position_and_landmark(position, landmark)
+
             self.dark_features.append(Feature.from_position_and_landmark(position, landmark))
 
         self.dark_features.sort(key=lambda f: f.center())
@@ -151,44 +172,40 @@ class Retina:
 
 
 def main():
-    landmarks: List[Landmark] = [Landmark(Vector(3.5, 2), 1), Landmark(Vector(3.5, -2), 1), Landmark(Vector(0, -4), 1)]
+    landmarks: List[Landmark] = []
+    print("No input validation implemented, so be careful!")
+    print("Setup:")
+    while True:
+        print("Initialising landmark...")
+        print("Input the x coordinate of the landmark:")
+        x = float(input())
+        print("Input the y coordinate of the landmark:")
+        y = float(input())
+        print("Input the diameter of the landmark:")
+        diameter = float(input())
+
+        landmarks.append(Landmark(Vector(x, y), diameter))
+        print("Do you want to add another landmark [y/n]?")
+        another = input()
+        if another.lower() != "y":
+            break
+
     snapshot = Retina(Vector(0, 0), landmarks)
 
-    homing_vectors_2d: List[List[Vector]] = []
-    errors = []
-    for y in range(-7, 8):
-        homing_vectors_2d.append([])
-        for x in range(-7, 8):
-            retina = Retina(Vector(x, y), landmarks)
-            homing_vector = retina.homing_vector(snapshot)
-            homing_vectors_2d[-1].append(retina.homing_vector(snapshot))
-            errors.append(abs(homing_vector.direction() - Vector(-x, -y).direction()))
+    while True:
+        print("Find homing vector...")
+        print("Input the x coordinate:")
+        x = float(input())
+        print("Input the y coordinate:")
+        y = float(input())
 
-    average_error = sum(errors) / len(errors)
-
-    window = tk.Tk()
-    grid_step = 50
-    width = len(homing_vectors_2d[0]) * grid_step
-    height = len(homing_vectors_2d) * grid_step
-    canvas = tk.Canvas(window, width=width, height=height)
-    canvas.pack()
-    for landmark in landmarks:
-        center_x = width / 2
-        center_y = height / 2
-        landmark_x = center_x + landmark.position.x * grid_step
-        landmark_y = center_y - landmark.position.y * grid_step
-        canvas.create_oval(landmark_x - 25, landmark_y + 25, landmark_x + 25, landmark_y - 25)
-
-    for y, homing_vectors in enumerate(homing_vectors_2d):
-        for x, homing_vector in enumerate(homing_vectors):
-            grid_center = Vector(grid_step / 2 + x * grid_step, grid_step / 2 + y * grid_step)
-            start = grid_center - homing_vector.change_length(25)
-            end = grid_center + homing_vector.change_length(25)
-            canvas.create_line(start.x, height - start.y, end.x, height - end.y, arrow=tk.LAST)
-            # print(round(math.degrees(homing_vector.direction()), 2), end='\t')
-        # print()
-    print(f"average error: {math.degrees(average_error)}°")
-    window.mainloop()
+        retina = Retina(Vector(x, y), landmarks)
+        homing_vector = retina.homing_vector(snapshot)
+        print(f"Direction of the homing vector in degrees: {math.degrees(homing_vector.direction())}")
+        print("Do you want to calculate another homing vector [y/n]?")
+        another = input()
+        if another.lower() != "y":
+            break
 
 
 if __name__ == '__main__':
