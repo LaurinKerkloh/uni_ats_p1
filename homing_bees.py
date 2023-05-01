@@ -76,8 +76,7 @@ class Feature:
     def center(self) -> float:
         return (self.start + self.width() / 2) % (2 * math.pi)
 
-    def mapping(self, features: List[Feature]) -> Feature:
-
+    def find_closest(self, features: List[Feature]) -> Feature:
         closest_feature = features[0]
         shortest_distance = math.sin((abs(self.center() - closest_feature.center())) / 2)
         for feature in features[1:]:
@@ -88,51 +87,88 @@ class Feature:
         return closest_feature
 
     def overlaps(self, other: Feature) -> bool:
-        a_start = self.start
-        a_end = self.end
-        b_start = other.start
-        b_end = other.end
-        if self.across_zero():
-            a_end += 2 * math.pi
-            b_start += 2 * math.pi
-            b_end += 2 * math.pi
-        if other.across_zero():
-            b_end += 2 * math.pi
+        f1 = self if self.center() < other.center() else other
+        f2 = other if self.center() < other.center() else self
 
-        return a_start < b_end and b_start < a_end
+        if f1.across_zero() and f2.across_zero():
+            return True
+        if (f1.across_zero() or f2.across_zero()) and f1.start < f2.end:
+            return True
+        if f1.end > f2.start:
+            return True
+        return False
+
+    @classmethod
+    def test_overlap(cls):
+        # was only used for testing
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(20), math.radians(55))) is True, f"t1 failed"
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(50), math.radians(100))) is True, f"t2 failed"
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(60), math.radians(90))) is True, f"t3 failed"
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(90), math.radians(110))) is True, f"t4 failed"
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(60), math.radians(90))) is True, f"t5 failed"
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(20), math.radians(30))) is False, f"t6 failed"
+        assert Feature(math.radians(50), math.radians(100)).overlaps(
+            Feature(math.radians(110), math.radians(150))) is False, f"t7 failed"
+
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(5), math.radians(15))) is True, f"t8 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(345), math.radians(355))) is True, f"t9 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(355), math.radians(359))) is True, f"t10 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(1), math.radians(9))) is True, f"t11 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(5), math.radians(355))) is True, f"t12 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(15), math.radians(20))) is False, f"t13 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(340), math.radians(345))) is False, f"t14 failed"
+
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(340), math.radians(5))) is True, f"t15 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(355), math.radians(15))) is True, f"t16 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(340), math.radians(15))) is True, f"t17 failed"
+        assert Feature(math.radians(350), math.radians(10)).overlaps(
+            Feature(math.radians(355), math.radians(5))) is True, f"t18 failed"
 
     def join(self, other: Feature) -> Feature:
         return Feature(min(self.start, other.start), max(self.end, other.end))
 
-    def pos_v(self, snapshot_feature: Feature) -> Vector:
-        vec = Vector(0, 0)
+    def turn_vector(self, snapshot_feature: Feature) -> Vector:
         if snapshot_feature.center() == self.center():
-            return vec
+            return Vector(0, 0)
+
+        left = (snapshot_feature.center() < self.center())
+        if (abs(snapshot_feature.center() - self.center())) > math.pi:
+            left = not left
+
+        if self.width() > math.pi:
+            left = not left
+
+        if left:
+            return Vector(math.cos(self.center() + (math.pi / 2)), math.sin(self.center() + (math.pi / 2)))
         else:
-            left = (snapshot_feature.center() < self.center())
-            if (abs(snapshot_feature.center() - self.center())) > math.pi:
-                left = not left
-            if left:
-                vec.x = math.cos(self.center() + (math.pi / 2))
-                vec.y = math.sin(self.center() + (math.pi / 2))
-            else:
-                vec.x = math.cos(self.center() - (math.pi / 2))
-                vec.y = math.sin(self.center() - (math.pi / 2))
+            return Vector(math.cos(self.center() - (math.pi / 2)), math.sin(self.center() - (math.pi / 2)))
 
-            return vec
-
-    def ang_v(self, snapshot_feature: Feature) -> Vector:
-        vec = Vector(0, 0)
+    def approach_vector(self, snapshot_feature: Feature) -> Vector:
         if snapshot_feature.width() == self.width():
-            return vec
+            return Vector(0, 0)
+
+        out = (snapshot_feature.width() > self.width())
+        if out:
+            vec = Vector(math.cos(self.center()), math.sin(self.center()))
+            return vec + vec + vec
         else:
-            out = (snapshot_feature.width() > self.width())
-            if out:
-                vec.x = math.cos(self.center())
-                vec.y = math.sin(self.center())
-            else:
-                vec.x = math.cos(self.center() + math.pi)
-                vec.y = math.sin(self.center() + math.pi)
+            vec = Vector(math.cos(self.center() + math.pi), math.sin(self.center() + math.pi))
             return vec + vec + vec
 
 
@@ -143,30 +179,30 @@ class Retina:
         self.white_features: List[Feature] = []
 
         for landmark in landmarks:
-            # dark_feature = Feature.from_position_and_landmark(position, landmark)
-
             self.dark_features.append(Feature.from_position_and_landmark(position, landmark))
 
         self.dark_features.sort(key=lambda f: f.center())
 
         for i in range(len(self.dark_features)):
-            start = self.dark_features[i].end
-            end = self.dark_features[(i + 1) % len(self.dark_features)].start
-            self.white_features.append(Feature(start, end))
+            f1 = self.dark_features[i]
+            f2 = self.dark_features[(i + 1) % len(self.dark_features)]
+            if f1.overlaps(f2):
+                continue
+            self.white_features.append(Feature(f1.end, f2.start))
 
     def homing_vector(self, snapshot: Retina):
         vector = Vector(0, 0)
         for dark_feature in snapshot.dark_features:
-            mapped_feature = dark_feature.mapping(self.dark_features)
-            dark_feature.pos_v(mapped_feature)
-            vector += mapped_feature.pos_v(dark_feature)
-            vector += mapped_feature.ang_v(dark_feature)
+            mapped_feature = dark_feature.find_closest(self.dark_features)
+            dark_feature.turn_vector(mapped_feature)
+            vector += mapped_feature.turn_vector(dark_feature)
+            vector += mapped_feature.approach_vector(dark_feature)
 
         for white_feature in snapshot.white_features:
-            mapped_feature = white_feature.mapping(self.white_features)
-            white_feature.pos_v(mapped_feature)
-            vector += mapped_feature.pos_v(white_feature)
-            vector += mapped_feature.ang_v(white_feature)
+            mapped_feature = white_feature.find_closest(self.white_features)
+            white_feature.turn_vector(mapped_feature)
+            vector += mapped_feature.turn_vector(white_feature)
+            vector += mapped_feature.approach_vector(white_feature)
 
         return vector.normalize()
 

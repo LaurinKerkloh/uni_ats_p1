@@ -3,7 +3,8 @@ import tkinter as tk
 
 
 def main():
-    landmarks: List[Landmark] = [Landmark(Vector(3.5, 2), 1), Landmark(Vector(3.5, -2), 1), Landmark(Vector(0, -4), 1)]
+    landmarks: List[Landmark] = [Landmark(Vector(3.5, 2), 0.5), Landmark(Vector(3.5, -2), 0.5),
+                                 Landmark(Vector(0, -4), 0.5)]
     snapshot = Retina(Vector(0, 0), landmarks)
 
     homing_vectors_2d: List[List[Vector]] = []
@@ -30,7 +31,8 @@ def main():
         center_y = height / 2
         landmark_x = center_x + landmark.position.x * grid_step
         landmark_y = center_y - landmark.position.y * grid_step
-        canvas.create_oval(landmark_x - 25, landmark_y + 25, landmark_x + 25, landmark_y - 25)
+        offset = 25 * landmark.diameter
+        canvas.create_oval(landmark_x - offset, landmark_y + offset, landmark_x + offset, landmark_y - offset)
 
     for y, homing_vectors in enumerate(homing_vectors_2d):
         for x, homing_vector in enumerate(homing_vectors):
@@ -38,8 +40,6 @@ def main():
             start = grid_center - homing_vector.change_length(25)
             end = grid_center + homing_vector.change_length(25)
             canvas.create_line(start.x, height - start.y, end.x, height - end.y, arrow=tk.LAST)
-            # print(round(math.degrees(homing_vector.direction()), 2), end='\t')
-        # print()
     print(f"average error: {math.degrees(average_error)}°")
     window.mainloop()
 
