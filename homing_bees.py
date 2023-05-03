@@ -1,3 +1,9 @@
+"""
+Implementation of the algorythm described in the Paper
+"How honey bees use landmarks to guide their return to a food source"
+Autonome Systeme Praktikum 1
+Laurin Kerkloh und André Dolata
+"""
 from __future__ import annotations
 
 import math
@@ -5,52 +11,107 @@ from typing import List
 
 
 class Vector:
+    """
+    This class represents a 2d Vector
+    Attributes:
+         x-coordinate : float
+         y-coordinate : float
+    """
+
     def __init__(self, x: float, y: float):
         self.x = x
         self.y = y
 
     def direction(self) -> float:
+        """
+        :return: the direction of the Vector
+        """
         direction = math.atan2(self.y, self.x)
         if direction < 0:
             direction += 2 * math.pi
         return direction
 
     def normalize(self) -> Vector:
+        """
+        :return: a normalized version of the Vector
+        """
         length = abs(self)
         if length == 0:
             return Vector(0, 0)
         return Vector(self.x / length, self.y / length)
 
     def change_length(self, length: float) -> Vector:
+        """
+        :param length:
+        :return: a copy of the Vector with the provided length
+        """
         normalized = self.normalize()
         return Vector(normalized.x * length, normalized.y * length)
 
     def __abs__(self) -> float:
+        """
+        Overloads the absolute operator
+        :return: The absolute value of the Vector
+        """
         return math.sqrt((self.x * self.x) + (self.y * self.y))
 
     def __sub__(self, other) -> Vector:
+        """
+        Overloads the subtraction operator -
+        :param other:
+        :return: The result of the subtraction of this vector minus the other
+        """
         return Vector(self.x - other.x, self.y - other.y)
 
     def __add__(self, other) -> Vector:
+        """
+        Overloads the addition operator +
+        :param other:
+        :return: The result of the addition of this vector plus the other
+        """
         return Vector(self.x + other.x, self.y + other.y)
 
 
 class Landmark:
+    """
+    This class represents a Landmark.
+
+    Attributes:
+        position: Vector
+        diameter: float
+    """
     def __init__(self, position: Vector, diameter: float):
         self.position = position
         self.diameter = diameter
 
     def radius(self) -> float:
+        """
+        :return: the radius of the Landmark
+        """
         return self.diameter / 2
 
 
 class Feature:
+    """
+    This class represents a feature on a circular retina.
+    Described by the angular position of the start and end in radians.
+    Attributes:
+        start: float
+        end: float
+
+    """
     def __init__(self, start: float, end: float):
         self.start = start
         self.end = end
 
     @classmethod
     def from_position_and_landmark(cls, position: Vector, landmark: Landmark) -> Feature:
+        """
+        This class method returns a new Feature based on the position of the retina and a given landmark.
+        :param position:
+        :param landmark:
+        :return:
+        """
         vector_to_center_of_landmark = landmark.position - position
         hypotenuse_length = abs(landmark.position - position)
         opposite_length = landmark.radius()
@@ -65,18 +126,33 @@ class Feature:
         return Feature(start, end)
 
     def across_zero(self) -> bool:
+        """
+        :return: True if the feature extends over the 0 degree point
+        """
         return self.start > self.end
 
     def width(self) -> float:
+        """
+        :return: the angular extent of the feature
+        """
         width = self.end - self.start
         if self.across_zero():
             width += (2 * math.pi)
         return width
 
     def center(self) -> float:
+        """
+        :return: the center point of the feature
+        """
         return (self.start + self.width() / 2) % (2 * math.pi)
 
     def find_closest(self, features: List[Feature]) -> Feature:
+        """
+        Finds the feature from a list with the center point,
+        which is located nearest to the center point of this feature.
+        :param features: list of features
+        :return: the closest feature
+        """
         closest_feature = features[0]
         shortest_distance = math.sin((abs(self.center() - closest_feature.center())) / 2)
         for feature in features[1:]:
@@ -87,6 +163,10 @@ class Feature:
         return closest_feature
 
     def overlaps(self, other: Feature) -> bool:
+        """
+        :param other:
+        :return: True if this feature overlaps with the other
+        """
         f1 = self if self.center() < other.center() else other
         f2 = other if self.center() < other.center() else self
 
@@ -100,7 +180,10 @@ class Feature:
 
     @classmethod
     def test_overlap(cls):
-        # was only used for testing
+        """
+        a test function for the overlap function;
+        only needed for testing
+        """
         assert Feature(math.radians(50), math.radians(100)).overlaps(
             Feature(math.radians(20), math.radians(55))) is True, f"t1 failed"
         assert Feature(math.radians(50), math.radians(100)).overlaps(
@@ -140,10 +223,12 @@ class Feature:
         assert Feature(math.radians(350), math.radians(10)).overlaps(
             Feature(math.radians(355), math.radians(5))) is True, f"t18 failed"
 
-    def join(self, other: Feature) -> Feature:
-        return Feature(min(self.start, other.start), max(self.end, other.end))
-
     def turn_vector(self, snapshot_feature: Feature) -> Vector:
+        """
+        Calculates a turn vector based on this feature and the provided feature from the snapshot.
+        :param snapshot_feature:
+        :return:
+        """
         if snapshot_feature.center() == self.center():
             return Vector(0, 0)
 
@@ -160,6 +245,11 @@ class Feature:
             return Vector(math.cos(self.center() - (math.pi / 2)), math.sin(self.center() - (math.pi / 2)))
 
     def approach_vector(self, snapshot_feature: Feature) -> Vector:
+        """
+
+        :param snapshot_feature:
+        :return:
+        """
         if snapshot_feature.width() == self.width():
             return Vector(0, 0)
 
@@ -173,7 +263,19 @@ class Feature:
 
 
 class Retina:
+    """
+    This class represents a Retina. It stores a collection of dark and white features.
+    Attributes:
+        position: Vector
+        dark_features: List[Feature]
+        white_features: List[Feature]
+    """
     def __init__(self, position: Vector, landmarks: List[Landmark]):
+        """
+        This constructs and stores the retina features for a given position and a given list of landmarks.
+        :param position: The position where the Retina is located
+        :param landmarks: a list of landmarks
+        """
         self.position: Vector = position
         self.dark_features: List[Feature] = []
         self.white_features: List[Feature] = []
@@ -191,6 +293,11 @@ class Retina:
             self.white_features.append(Feature(f1.end, f2.start))
 
     def homing_vector(self, snapshot: Retina):
+        """
+        Calculates the homing vector for the current retina based on a given snapshot.
+        :param snapshot: A retina to which we want to return
+        :return: the homing vector
+        """
         vector = Vector(0, 0)
         for dark_feature in snapshot.dark_features:
             mapped_feature = dark_feature.find_closest(self.dark_features)
@@ -208,6 +315,9 @@ class Retina:
 
 
 def main():
+    """
+    A CLI for manual usage.
+    """
     landmarks: List[Landmark] = []
     print("No input validation implemented, so be careful!")
     print("Setup:")
