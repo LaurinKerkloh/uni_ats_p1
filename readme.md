@@ -10,3 +10,6 @@ Python Packages: Tkinter
 with homing_bees.py and test.py at the same location run
 
     python test.py
+
+A window displaying the homing vectors will open.
+The title of the window displays the average error.
